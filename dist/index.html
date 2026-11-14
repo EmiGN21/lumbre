@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f8f7ef">
+  <meta name="description" content="Escucha clásicos en español y retoma desde donde quedaste.">
+  <title>Lumbre — Audiolibros en español</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Ir al contenido</a>
+  <aside class="sidebar">
+    <a class="brand" href="#explorar" aria-label="Lumbre, inicio"><span class="mark" data-icon="flame"></span><span>Lumbre<small>AUDIOLIBROS</small></span></a>
+    <nav aria-label="Navegación principal">
+      <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
+      <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
+    </nav>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <a class="mobile-brand brand" href="#explorar" aria-label="Lumbre, inicio"><span class="mark" data-icon="flame"></span><span>Lumbre</span></a>
+      <form class="search" role="search">
+        <span data-icon="search"></span><input id="search" type="search" aria-label="Buscar audiolibros" placeholder="Buscar título o autor" autocomplete="off"><kbd aria-hidden="true">/</kbd>
+      </form>
+    </header>
+    <main id="main" tabindex="-1">
+      <section id="home">
+        <div class="intro"><h1>Explorar</h1><p>Audiolibros gratuitos en español.</p></div>
+        <article class="hero">
+          <div class="hero-copy">
+            <h2>Don Quijote<br>de la Mancha</h2>
+            <p class="hero-author">Miguel de Cervantes</p>
+            <p class="hero-description">Un hidalgo, su escudero y una aventura que empieza más allá de los molinos.</p>
+            <button class="button hero-button" data-action="play-book" data-book="quijote" disabled><span data-icon="play"></span><span id="hero-action">Escuchar ahora</span></button>
+          </div>
+        </article>
+      </section>
+      <section id="shelf" aria-labelledby="shelf-title">
+        <div class="shelf-heading"><h2 id="shelf-title">Catálogo</h2><span id="shelf-count"></span></div>
+        <div class="filters" id="filters" aria-label="Filtrar catálogo"></div>
+        <div class="books" id="books"><p class="muted">Cargando audiolibros…</p></div>
+      </section>
+      <footer class="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso se guarda en este navegador.</span></footer>
+    </main>
+  </div>
+  <section class="dock" aria-label="Reproductor" id="dock" hidden>
+    <button class="dock-book" data-action="details-current"><span id="dock-art" class="mini-art"></span><span><strong id="now-title"></strong><small id="now-chapter"></small></span></button>
+    <div class="transport">
+      <div class="controls">
+        <button class="icon-button optional" data-action="previous" aria-label="Capítulo anterior" data-icon="previous"></button>
+        <button class="icon-button" data-action="rewind" aria-label="Retroceder 15 segundos" data-icon="rewind"></button>
+        <button class="round" data-action="toggle" aria-label="Reproducir" data-icon="play"></button>
+        <button class="icon-button" data-action="forward" aria-label="Adelantar 15 segundos" data-icon="forward"></button>
+        <button class="icon-button optional" data-action="next" aria-label="Capítulo siguiente" data-icon="next"></button>
+      </div>
+      <div class="timeline"><span id="elapsed">0:00</span><input id="seek" type="range" min="0" max="1" value="0" step="0.1" aria-label="Posición de reproducción"><span id="total">0:00</span></div>
+    </div>
+    <div class="extras">
+      <label class="speed"><span class="sr-only">Velocidad</span><select id="speed"><option value=".75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option></select></label>
+      <details class="sleep"><summary class="icon-button" aria-label="Temporizador" title="Temporizador" data-icon="moon"></summary><div><strong>Temporizador</strong><button data-action="sleep" data-minutes="15">15 minutos</button><button data-action="sleep" data-minutes="30">30 minutos</button><button data-action="sleep" data-minutes="60">60 minutos</button><button data-action="sleep" data-minutes="0">Desactivar</button></div></details>
+      <button class="icon-button chapter-open" data-action="details-current" aria-label="Ver capítulos" title="Ver capítulos" data-icon="list"></button>
+    </div>
+    <p id="player-error" role="status" hidden></p>
+  </section>
+  <nav class="mobile-nav" aria-label="Navegación móvil">
+    <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
+    <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
+  </nav>
+  <dialog id="book-dialog" aria-labelledby="detail-title">
+    <div class="dialog-top"><button class="icon-button close" data-action="close" aria-label="Cerrar" data-icon="close"></button></div>
+    <div class="detail-body" id="detail-body"></div>
+  </dialog>
+  <div id="notice" class="toast" role="status" hidden></div>
+  <audio id="audio" preload="metadata"></audio>
+</body>
+</html>
