@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f8f7ef">
-  <meta name="description" content="Escucha clásicos en español y retoma desde donde quedaste.">
+  <meta name="description" content="Escucha clásicos en español y convierte tus PDF en lecturas en voz alta.">
   <title>Lumbre — Audiolibros en español</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./style.css">
@@ -18,6 +18,9 @@
       <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
       <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
     </nav>
+    <div class="side-bottom">
+      <button class="add-link" data-action="import"><span class="side-file" data-icon="file"></span><span><strong>Importar PDF</strong><small>Escucha tus documentos</small></span><span data-icon="plus"></span></button>
+    </div>
   </aside>
   <div class="workspace">
     <header class="topbar">
@@ -25,6 +28,7 @@
       <form class="search" role="search">
         <span data-icon="search"></span><input id="search" type="search" aria-label="Buscar audiolibros" placeholder="Buscar título o autor" autocomplete="off"><kbd aria-hidden="true">/</kbd>
       </form>
+      <button class="button outline" data-action="import"><span data-icon="plus"></span><span>Importar PDF</span></button>
     </header>
     <main id="main" tabindex="-1">
       <section id="home">
@@ -43,7 +47,7 @@
         <div class="filters" id="filters" aria-label="Filtrar catálogo"></div>
         <div class="books" id="books"><p class="muted">Cargando audiolibros…</p></div>
       </section>
-      <footer class="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso se guarda en este navegador.</span></footer>
+      <footer class="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso y tus PDF se guardan en este navegador.</span></footer>
     </main>
   </div>
   <section class="dock" aria-label="Reproductor" id="dock" hidden>
@@ -68,10 +72,25 @@
   <nav class="mobile-nav" aria-label="Navegación móvil">
     <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
     <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
+    <button data-action="import"><span data-icon="file"></span>Importar PDF</button>
   </nav>
   <dialog id="book-dialog" aria-labelledby="detail-title">
     <div class="dialog-top"><button class="icon-button close" data-action="close" aria-label="Cerrar" data-icon="close"></button></div>
     <div class="detail-body" id="detail-body"></div>
+  </dialog>
+  <dialog id="import-dialog" aria-labelledby="import-title">
+    <div class="dialog-top"><button class="icon-button close" data-action="close" aria-label="Cerrar" data-icon="close"></button></div>
+    <div class="import-body">
+      <span class="import-mark" data-icon="file"></span>
+      <h2 id="import-title">Importar PDF</h2>
+      <p>Agrega un PDF con texto seleccionable y escúchalo con una voz en español del dispositivo.</p>
+      <form id="import-form">
+        <label class="dropzone" id="dropzone"><span data-icon="upload"></span><strong id="file-label">Seleccionar un PDF</strong><small>También puedes arrastrarlo aquí · hasta 40 MB</small><input type="file" id="file" accept=".pdf,application/pdf" required></label>
+        <label class="field">Título <input id="pdf-title" maxlength="120" placeholder="Nombre del audiolibro"></label>
+        <p id="import-status" role="status" hidden></p>
+        <button class="button primary" type="submit" id="import-submit"><span data-icon="plus"></span>Agregar a mi biblioteca</button>
+      </form>
+    </div>
   </dialog>
   <div id="notice" class="toast" role="status" hidden></div>
   <audio id="audio" preload="metadata"></audio>

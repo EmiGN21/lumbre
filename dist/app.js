@@ -49,14 +49,40 @@ function save(key, value) {
   }
 }
 
+let db
+function libraryDb() {
+  if (!db) db = new Promise((resolve, reject) => {
+    const request = indexedDB.open('lumbre-biblioteca', 1)
+    request.onupgradeneeded = () => request.result.createObjectStore('pdfs', { keyPath: 'id' })
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  }).catch(error => {
+    db = undefined
+    throw error
+  })
+  return db
+}
+
+async function pdfStorage(mode, operation) {
+  const database = await libraryDb()
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction('pdfs', mode)
+    const request = operation(transaction.objectStore('pdfs'))
+    transaction.oncomplete = () => resolve(request.result)
+    transaction.onabort = () => reject(transaction.error)
+  })
+}
+
 const audio = $('#audio')
 const dock = $('#dock')
 const seek = $('#seek')
 const search = $('#search')
 const bookDialog = $('#book-dialog')
+const importDialog = $('#import-dialog')
 const progress = load('progress', {})
 const saved = new Set(load('saved', []))
 let catalog = []
+let pdfs = []
 let filter = 'Todos'
 let catalogError = false
 let loading = true
@@ -68,6 +94,7 @@ let sleepTimer
 let toastTimer
 let utterance
 let speechPlaying = false
+let selectedFile
 
 $('#speed').value = String(speed).replace(/^0\./, '.')
 renderIcons(document)
@@ -99,7 +126,7 @@ function readingLength(seconds) {
   return [Math.floor(mins / 60) ? Math.floor(mins / 60) + ' h' : '', mins % 60 ? mins % 60 + ' min' : ''].filter(Boolean).join(' ')
 }
 
-function findBook(id) { return catalog.find(book => book.id === id) }
+function findBook(id) { return [...catalog, ...pdfs].find(book => book.id === id) }
 function theme(book) { return book.type === 'pdf' ? 'pdf' : book.id }
 function playableProgress(book) { return progress[book.id] && !progress[book.id].finished }
 function playLabel(book) { return playableProgress(book) ? 'Continuar' : 'Escuchar' }
@@ -143,7 +170,8 @@ function renderShelf() {
   $('#home').hidden = library || !!query
   const title = library ? 'Mi biblioteca' : query ? 'Resultados de búsqueda' : 'Catálogo'
   $('#shelf-title').textContent = title
-  let entries = library ? catalog.filter(book => saved.has(book.id) || progress[book.id]) : catalog
+  let entries = library ? [...pdfs.slice().reverse(), ...catalog.filter(book => saved.has(book.id) || progress[book.id])] : catalog
+  if (!library && query) entries = [...catalog, ...pdfs]
   entries = entries.filter(book => (!query && !library && filter !== 'Todos' ? book.genre === filter : true) &&
     (!query || normalize(book.title + ' ' + book.author + ' ' + book.genre).includes(query)))
 
@@ -161,7 +189,7 @@ function renderShelf() {
   if (entries.length) list.innerHTML = entries.map(bookCard).join('')
   else if (loading) list.innerHTML = '<p class="muted">Cargando audiolibros…</p>'
   else if (query) list.innerHTML = '<div class="empty"><h3>Sin resultados</h3><p>Prueba con otro título, autor o género.</p><button class="button outline" data-action="clear-search">Borrar búsqueda</button></div>'
-  else if (library) list.innerHTML = '<div class="empty"><h3>Tu biblioteca está vacía</h3><p>Guarda un título o empieza a escuchar un libro del catálogo.</p><a class="button outline" href="#explorar">Explorar catálogo</a></div>'
+  else if (library) list.innerHTML = '<div class="empty"><h3>Tu biblioteca está vacía</h3><p>Importa un PDF o empieza a escuchar un libro del catálogo.</p><button class="button primary" data-action="import">' + icon('plus') + ' Importar PDF</button></div>'
   else if (catalogError) list.innerHTML = '<div class="empty"><h3>El catálogo no cargó</h3><p>Vuelve a intentarlo en unos segundos.</p><button class="button outline" data-action="retry">Reintentar</button></div>'
   const featured = findBook('quijote')
   $('[data-book="quijote"][data-action="play-book"]', $('#home')).disabled = !featured
@@ -453,6 +481,92 @@ function setSleep(minutes) {
   notify(minutes ? 'La reproducción se pausará en ' + minutes + ' minutos.' : 'Temporizador desactivado.')
 }
 
+function importFeedback(message, error = false) {
+  const status = $('#import-status')
+  status.hidden = !message
+  status.textContent = message
+  status.toggleAttribute('data-error', error)
+}
+
+function chooseFile(file) {
+  selectedFile = file
+  $('#file-label').textContent = file?.name ?? 'Seleccionar un PDF'
+  $('#pdf-title').value = file?.name.replace(/\.pdf$/i, '').slice(0, 120) ?? ''
+  importFeedback('')
+}
+
+function openImport() {
+  if (!importDialog.open) importDialog.showModal()
+}
+
+$('#file').addEventListener('change', event => chooseFile(event.target.files[0]))
+const dropzone = $('#dropzone')
+dropzone.addEventListener('dragover', event => { event.preventDefault(); dropzone.classList.add('drag') })
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'))
+dropzone.addEventListener('drop', event => {
+  event.preventDefault()
+  dropzone.classList.remove('drag')
+  if ($('#import-submit').disabled || !event.dataTransfer.files.length) return
+  $('#file').files = event.dataTransfer.files
+  chooseFile(event.dataTransfer.files[0])
+})
+
+$('#import-form').addEventListener('submit', async event => {
+  event.preventDefault()
+  if (!selectedFile || !/\.pdf$/i.test(selectedFile.name)) return importFeedback('Elige un archivo .pdf.', true)
+  if (selectedFile.size > 40 * 1024 * 1024) return importFeedback('El PDF pesa más de 40 MB. Divídelo en archivos más pequeños.', true)
+  const submit = $('#import-submit')
+  submit.disabled = true
+  $('#file').disabled = true
+  $('#pdf-title').readOnly = true
+  importFeedback('Abriendo el documento…')
+  try {
+    const { extractPdf } = await import('./pdf-import.js')
+    const chapters = await extractPdf(selectedFile, (page, total) => importFeedback('Leyendo página ' + page + ' de ' + total + '…'))
+    const title = $('#pdf-title').value.trim() || selectedFile.name.replace(/\.pdf$/i, '').slice(0, 120) || 'Documento PDF'
+    const book = { id: 'pdf-' + crypto.randomUUID(), title, author: '', type: 'pdf', genre: 'PDF', chapters, duration: chapters.reduce((sum, chapter) => sum + chapter.duration, 0) }
+    await pdfStorage('readwrite', store => store.add(book))
+    pdfs.push(book)
+    $('#import-form').reset()
+    chooseFile(undefined)
+    importDialog.close()
+    search.value = ''
+    location.hash = 'biblioteca'
+    renderShelf()
+    showDetails(book)
+    notify('PDF agregado a tu biblioteca.')
+  } catch (error) {
+    importFeedback(error instanceof Error && error.message ? error.message : 'No se pudo importar el PDF. Comprueba el archivo y el espacio del navegador.', true)
+  } finally {
+    $('#file').disabled = false
+    $('#pdf-title').readOnly = false
+    submit.disabled = false
+  }
+})
+
+async function removePdf(book, button) {
+  if (!book || !window.confirm('¿Eliminar «' + book.title + '» y su progreso de esta biblioteca?')) return
+  button.disabled = true
+  try {
+    await pdfStorage('readwrite', store => store.delete(book.id))
+    if (current?.book.id === book.id) {
+      halt()
+      current = null
+      dock.hidden = true
+    }
+    if (load('recent', '') === book.id) save('recent', '')
+    pdfs = pdfs.filter(item => item.id !== book.id)
+    delete progress[book.id]
+    save('progress', progress)
+    bookDialog.close()
+    renderShelf()
+    notify('PDF eliminado.')
+  } catch {
+    notify('No se pudo eliminar el PDF. Vuelve a intentarlo.')
+    button.disabled = false
+  }
+}
+
 document.addEventListener('click', event => {
   const target = event.target.closest('[data-action]')
   if (!target) return
@@ -471,6 +585,7 @@ document.addEventListener('click', event => {
     case 'next': relativeChapter(1); break
     case 'rewind': positionAt(shownPosition() - 15); break
     case 'forward': positionAt(shownPosition() + 15); break
+    case 'import': openImport(); break
     case 'close': target.closest('dialog').close(); break
     case 'sleep': setSleep(Number(target.dataset.minutes)); break
     case 'clear-search': search.value = ''; renderShelf(); search.focus(); break
@@ -483,6 +598,7 @@ document.addEventListener('click', event => {
       target.innerHTML = icon(saved.has(book.id) ? 'check' : 'bookmark') + (saved.has(book.id) ? ' Guardado' : ' Guardar')
       renderShelf()
       break
+    case 'delete-pdf': removePdf(book, target); break
   }
 })
 
@@ -520,7 +636,12 @@ async function loadCatalog() {
   }
 }
 
-await loadCatalog()
+await Promise.all([
+  loadCatalog(),
+  pdfStorage('readonly', store => store.getAll()).then(books => { pdfs = books; renderShelf() }).catch(() => {
+    notify('El navegador no permitió abrir la biblioteca de PDF.')
+  }),
+])
 const recent = findBook(load('recent', ''))
 const previous = recent && progress[recent.id]
 if (!current && previous && !previous.finished && recent.chapters[previous.chapter]) {
