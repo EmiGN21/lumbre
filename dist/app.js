@@ -21,6 +21,7 @@ const drawings = {
   check: '<path d="m5 12 4 4L19 6"/>',
   bookmark: '<path d="M7 4h10v16l-5-4-5 4z"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6m4-6v6"/>',
+  text: '<path d="M4 5h16M4 10h16M4 15h16M4 20h10"/>',
 }
 
 function icon(name) {
@@ -95,7 +96,9 @@ let toastTimer
 let utterance
 let speechPlaying = false
 let selectedFile
-
+let readerPart
+let readerLines = []
+let activeLine = -1
 $('#speed').value = String(speed).replace(/^0\./, '.')
 renderIcons(document)
 
@@ -109,6 +112,7 @@ function notify(message) {
 
 function playerError(message = '') {
   const feedback = $('#player-error')
+  if (feedback.textContent === message) return
   feedback.textContent = message
   feedback.hidden = !message
 }
@@ -162,12 +166,23 @@ function normalize(text) {
 
 function renderShelf() {
   const library = location.hash === '#biblioteca'
+  const reading = location.hash === '#lectura'
   const query = normalize(search.value.trim())
   for (const link of $$('[data-view]')) {
-    if (link.dataset.view === (library ? 'biblioteca' : 'explorar')) link.setAttribute('aria-current', 'page')
+    if (link.dataset.view === (reading ? 'lectura' : library ? 'biblioteca' : 'explorar')) link.setAttribute('aria-current', 'page')
     else link.removeAttribute('aria-current')
   }
-  $('#home').hidden = library || !!query
+  $('#reading').hidden = !reading
+  $('#shelf').hidden = reading
+  $('#credits').hidden = reading
+  $('.search').hidden = reading
+  $('.topbar').classList.toggle('reader-topbar', reading)
+  $('[data-action="read-current"]', dock).setAttribute('aria-pressed', String(reading))
+  $('#home').hidden = reading || library || !!query
+  if (reading) {
+    renderReader()
+    return
+  }
   const title = library ? 'Mi biblioteca' : query ? 'Resultados de búsqueda' : 'Catálogo'
   $('#shelf-title').textContent = title
   let entries = library ? [...pdfs.slice().reverse(), ...catalog.filter(book => saved.has(book.id) || progress[book.id])] : catalog
@@ -204,11 +219,12 @@ function showDetails(book) {
   const pdf = book.type === 'pdf'
   const resume = playableProgress(book) ? 'Continuar' : 'Escuchar'
   const meta = pdf ? 'PDF · Lectura en voz alta' : [book.author, book.tag, readingLength(book.duration)].filter(Boolean).join(' · ')
-  const description = pdf ? 'Lectura con la voz en español de tu dispositivo.' : book.description
+  const description = pdf ? 'Sigue el texto en la pestaña Lectura o escúchalo en español.' : book.description
   const secondary = pdf
     ? '<button class="button outline" data-action="delete-pdf">' + icon('trash') + ' Eliminar PDF</button>'
     : '<button class="button outline" data-action="bookmark" aria-pressed="' + bookmarked + '">' + icon(bookmarked ? 'check' : 'bookmark') + (bookmarked ? ' Guardado' : ' Guardar') + '</button>'
   const source = pdf ? '' : '<a class="source" href="' + book.source + '" target="_blank" rel="noopener">Edición y narradores en LibriVox</a>'
+  const read = pdf ? '<button class="button outline" data-action="read-book" data-book="' + book.id + '">' + icon('text') + ' Leer</button>' : ''
   const chapters = book.chapters.map((part, i) => {
     const selected = current?.book.id === book.id ? current.chapter === i : state?.chapter === i && !state?.finished
     const extra = !pdf && part.reader ? '<br><small>' + escape(part.reader) + '</small>' : ''
@@ -218,7 +234,7 @@ function showDetails(book) {
   }).join('')
   $('#detail-body').innerHTML = '<div class="detail-head">' + art(book) + '<div><h2 id="detail-title">' + escape(book.title) + '</h2><p class="muted">' + escape(meta) +
     '</p><p>' + escape(description) + '</p><div class="detail-actions"><button class="button primary" data-action="play-book" data-book="' + book.id + '">' + icon('play') + ' ' + resume +
-    '</button>' + secondary + '</div>' + source + '</div></div><h3 class="chapter-heading">' + (pdf ? 'Secciones' : 'Capítulos') + '</h3><ol class="chapters">' + chapters + '</ol>'
+    '</button>' + read + secondary + '</div>' + source + '</div></div><h3 class="chapter-heading">' + (pdf ? 'Secciones' : 'Capítulos') + '</h3><ol class="chapters">' + chapters + '</ol>'
   if (!bookDialog.open) {
     bookDialog.showModal()
     bookDialog.scrollTop = 0
@@ -235,6 +251,91 @@ function shownPosition() {
   return speaking() ? current.position / part.text.length * part.duration : current.position
 }
 
+function renderReader() {
+  const part = activePart()
+  const container = $('#reader-text')
+  const empty = $('#reader-empty')
+  const hasText = !!part?.text
+  $('#reading-title').textContent = hasText ? current.book.title : 'Lectura'
+  $('#reading-meta').textContent = hasText ? part.title : ''
+  $('#reading-actions').hidden = !hasText
+  empty.hidden = hasText
+  if (!hasText) {
+    readerPart = undefined
+    readerLines = []
+    container.replaceChildren()
+    const hint = current ? 'Este capítulo de LibriVox no tiene texto sincronizado. Puedes usar Lectura con tus PDF importados.' :
+      'Abre un PDF de tu biblioteca para seguir el texto mientras lo escuchas.'
+    empty.innerHTML = '<h3>' + (current ? 'Texto sincronizado para tus PDF' : 'Elige un PDF para empezar') +
+      '</h3><p>' + hint + '</p><a class="button primary" href="#biblioteca">Ir a mi biblioteca</a> ' +
+      '<button class="button outline" data-action="import">Importar PDF</button>'
+    return
+  }
+  if (readerPart === part) {
+    updateReader()
+    return
+  }
+  readerPart = part
+  readerLines = []
+  activeLine = -1
+  const lines = document.createDocumentFragment()
+  const text = part.text
+  for (let start = 0; start < text.length;) {
+    const fragment = speechChunk(text, start)
+    if (fragment.trim()) {
+      const line = document.createElement('button')
+      line.type = 'button'
+      line.className = 'reader-line'
+      line.dataset.action = 'read-from'
+      line.dataset.offset = start
+      line.textContent = fragment.trim()
+      lines.append(line)
+      readerLines.push({ start, element: line })
+    }
+    start += fragment.length
+  }
+  container.replaceChildren(lines)
+  container.scrollTop = 0
+  updateReader()
+}
+
+function lineIndex(position) {
+  let left = 0
+  let right = readerLines.length
+  while (left < right) {
+    const middle = (left + right) >>> 1
+    if (readerLines[middle].start <= position) left = middle + 1
+    else right = middle
+  }
+  return left - 1
+}
+
+function updateReader() {
+  if ($('#reading').hidden || !speaking() || readerPart !== activePart()) return
+  const index = lineIndex(current.position)
+  if (index < 0 || index === activeLine) return
+  readerLines[activeLine]?.element.removeAttribute('aria-current')
+  activeLine = index
+  const line = readerLines[index].element
+  line.setAttribute('aria-current', 'true')
+  const container = $('#reader-text')
+  const desired = line.offsetTop - Math.max(8, (container.clientHeight - line.offsetHeight) * .43)
+  container.scrollTo({ top: desired, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+}
+
+function openReader(book) {
+  if (book?.type === 'pdf' && current?.book.id !== book.id) {
+    const savedPosition = progress[book.id]
+    const chapter = savedPosition?.finished ? 0 : savedPosition?.chapter ?? 0
+    openPart(book, chapter, savedPosition?.finished ? 0 : savedPosition?.position ?? 0, false)
+  }
+  if (bookDialog.open) bookDialog.close()
+  search.value = ''
+  location.hash = 'lectura'
+  renderShelf()
+  $('#reading-title').focus({ preventScroll: true })
+}
+
 function updateTimeline() {
   const duration = partDuration()
   const position = shownPosition()
@@ -243,6 +344,7 @@ function updateTimeline() {
   seek.setAttribute('aria-valuetext', (speaking() ? 'Tiempo aproximado ' : '') + formatTime(position) + ' de ' + formatTime(duration))
   $('#elapsed').textContent = formatTime(position)
   $('#total').textContent = (speaking() ? '≈ ' : '') + formatTime(duration)
+  updateReader()
 }
 
 function updatePlayer() {
@@ -280,7 +382,10 @@ function stopSpeech() {
 
 function halt() {
   if (!current) return
-  if (speaking()) stopSpeech()
+  if (speaking()) {
+    stopSpeech()
+    playerError()
+  }
   else audio.pause()
   persist(true)
   updatePlayer()
@@ -327,7 +432,7 @@ function start() {
   }
   current.started = true
   playerError()
-  if (speaking()) startSpeech()
+  if (speaking()) startNarration()
   else {
     const request = current
     if (audio.error) audio.load()
@@ -345,12 +450,17 @@ function spanishVoice() {
 }
 
 function speechChunk(text, start) {
-  const windowText = text.slice(start, start + 240)
+  const windowText = text.slice(start, start + 220)
+  const sentence = /[.!?…]+["”»]?(?:\s+|$)|\n{2,}/.exec(windowText)
+  if (sentence?.index >= 8) return windowText.slice(0, sentence.index + sentence[0].length)
   if (start + windowText.length >= text.length) return windowText
-  const sentence = [...windowText.matchAll(/[.!?;:]\s+/g)].at(-1)
-  if (sentence && sentence.index >= 45) return windowText.slice(0, sentence.index + sentence[0].length)
-  const space = windowText.lastIndexOf(' ')
+  const space = windowText.search(/\s+\S*$/)
   return windowText.slice(0, space > 0 ? space + 1 : windowText.length)
+}
+
+function startNarration() {
+  stopSpeech()
+  startSpeech()
 }
 
 function startSpeech() {
@@ -359,7 +469,6 @@ function startSpeech() {
     playerError('Activa una voz de español en los ajustes del dispositivo y vuelve a pulsar Reproducir.')
     return
   }
-  stopSpeech()
   speechPlaying = true
   const text = activePart().text
   const offset = Math.floor(current.position)
@@ -404,7 +513,7 @@ function positionAt(seconds) {
     const text = activePart().text
     const index = Math.floor(position / duration * text.length)
     current.position = index > 0 ? text.lastIndexOf(' ', index - 1) + 1 : 0
-    if (wasPlaying) startSpeech()
+    if (wasPlaying) startNarration()
   } else {
     current.position = position
     if (current.ready) audio.currentTime = position
@@ -413,6 +522,13 @@ function positionAt(seconds) {
   current.finished = false
   updateTimeline()
   persist(true)
+}
+
+function readFrom(offset) {
+  if (!speaking() || !Number.isInteger(offset) || offset < 0 || offset >= activePart().text.length) return
+  current.position = offset
+  current.finished = false
+  start()
 }
 
 function relativeChapter(direction) {
@@ -463,7 +579,7 @@ $('#speed').addEventListener('change', event => {
   speed = Number(event.target.value)
   save('speed', speed)
   audio.playbackRate = speed
-  if (speechPlaying) startSpeech()
+  if (speechPlaying) startNarration()
 })
 
 function setSleep(minutes) {
@@ -576,6 +692,9 @@ document.addEventListener('click', event => {
     case 'filter': filter = target.dataset.filter; renderShelf(); break
     case 'details': showDetails(book); break
     case 'details-current': showDetails(current?.book); break
+    case 'read-book': openReader(book); break
+    case 'read-current': openReader(current?.book); break
+    case 'read-from': readFrom(Number(target.dataset.offset)); break
     case 'play-book': playBook(book); break
     case 'chapter': playBook(book, Number(target.dataset.chapter)); break
     case 'toggle':
@@ -606,6 +725,7 @@ search.addEventListener('input', renderShelf)
 $('.search').addEventListener('submit', event => event.preventDefault())
 document.addEventListener('keydown', event => {
   if (event.key === '/' && !document.querySelector('dialog[open]') && !event.target.closest('input,textarea,[contenteditable]')) {
+    if (search.closest('form').hidden) return
     event.preventDefault()
     search.focus()
   }
@@ -617,6 +737,7 @@ for (const nav of $$('[data-view], .brand')) nav.addEventListener('click', () =>
 })
 window.addEventListener('hashchange', () => { renderShelf(); window.scrollTo(0, 0) })
 window.addEventListener('pagehide', () => { persist(true); if (speaking()) stopSpeech() })
+window.addEventListener('pageshow', event => { if (event.persisted) updatePlayer() })
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(true) })
 window.speechSynthesis?.getVoices()
 

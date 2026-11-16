@@ -17,6 +17,7 @@
     <nav aria-label="Navegación principal">
       <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
       <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
+      <a href="#lectura" data-view="lectura"><span data-icon="text"></span>Lectura</a>
     </nav>
     <div class="side-bottom">
       <button class="add-link" data-action="import"><span class="side-file" data-icon="file"></span><span><strong>Importar PDF</strong><small>Escucha tus documentos</small></span><span data-icon="plus"></span></button>
@@ -47,7 +48,17 @@
         <div class="filters" id="filters" aria-label="Filtrar catálogo"></div>
         <div class="books" id="books"><p class="muted">Cargando audiolibros…</p></div>
       </section>
-      <footer class="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso y tus PDF se guardan en este navegador.</span></footer>
+      <section id="reading" aria-labelledby="reading-title" hidden>
+        <header class="reader-head">
+          <div><h1 id="reading-title" tabindex="-1">Lectura</h1><p id="reading-meta"></p></div>
+          <div id="reading-actions" class="reading-actions" hidden>
+            <button class="button outline" data-action="details-current"><span data-icon="list"></span>Secciones</button>
+          </div>
+        </header>
+        <div id="reader-text" tabindex="0" aria-label="Texto de la sección"></div>
+        <div id="reader-empty" class="empty"></div>
+      </section>
+      <footer class="credits" id="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso y tus PDF se guardan en este navegador.</span></footer>
     </main>
   </div>
   <section class="dock" aria-label="Reproductor" id="dock" hidden>
@@ -65,6 +76,7 @@
     <div class="extras">
       <label class="speed"><span class="sr-only">Velocidad</span><select id="speed"><option value=".75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option></select></label>
       <details class="sleep"><summary class="icon-button" aria-label="Temporizador" title="Temporizador" data-icon="moon"></summary><div><strong>Temporizador</strong><button data-action="sleep" data-minutes="15">15 minutos</button><button data-action="sleep" data-minutes="30">30 minutos</button><button data-action="sleep" data-minutes="60">60 minutos</button><button data-action="sleep" data-minutes="0">Desactivar</button></div></details>
+      <button class="icon-button reading-open" data-action="read-current" aria-label="Leer mientras escuchas" title="Leer mientras escuchas" data-icon="text"></button>
       <button class="icon-button chapter-open" data-action="details-current" aria-label="Ver capítulos" title="Ver capítulos" data-icon="list"></button>
     </div>
     <p id="player-error" role="status" hidden></p>
@@ -72,6 +84,7 @@
   <nav class="mobile-nav" aria-label="Navegación móvil">
     <a href="#explorar" data-view="explorar"><span data-icon="compass"></span>Explorar</a>
     <a href="#biblioteca" data-view="biblioteca"><span data-icon="library"></span>Mi biblioteca</a>
+    <a href="#lectura" data-view="lectura"><span data-icon="text"></span>Lectura</a>
     <button data-action="import"><span data-icon="file"></span>Importar PDF</button>
   </nav>
   <dialog id="book-dialog" aria-labelledby="detail-title">
@@ -83,7 +96,7 @@
     <div class="import-body">
       <span class="import-mark" data-icon="file"></span>
       <h2 id="import-title">Importar PDF</h2>
-      <p>Agrega un PDF con texto seleccionable y escúchalo con una voz en español del dispositivo.</p>
+      <p>Agrega un PDF con texto seleccionable para escucharlo en español y seguir el texto en la pestaña Lectura.</p>
       <form id="import-form">
         <label class="dropzone" id="dropzone"><span data-icon="upload"></span><strong id="file-label">Seleccionar un PDF</strong><small>También puedes arrastrarlo aquí · hasta 40 MB</small><input type="file" id="file" accept=".pdf,application/pdf" required></label>
         <label class="field">Título <input id="pdf-title" maxlength="120" placeholder="Nombre del audiolibro"></label>

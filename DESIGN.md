@@ -6,3 +6,4 @@ Biblioteca editorial de clásicos. Grabados nocturnos y portadas de tinta sobre 
 - Instrument Serif para nombre y títulos. DM Sans para controles, información y atención a estados.
 - Navegación lateral fija en escritorio. Barra inferior en móvil. El reproductor persiste al navegar y su ficha enlaza a capítulos o secciones.
 - Los libros de catálogo traen grabados; los PDF se reconocen por un icono de documento. El foco de teclado usa un contorno de alto contraste.
+- Lectura usa párrafos amplios en Instrument Serif. El fragmento narrado se resalta en oro y se centra al avanzar.
