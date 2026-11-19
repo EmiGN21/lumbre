@@ -1,3 +1,5 @@
+import { NeuralVoice } from './neural-voice.js'
+
 const $ = (selector, parent = document) => parent.querySelector(selector)
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)]
 
@@ -96,10 +98,23 @@ let toastTimer
 let utterance
 let speechPlaying = false
 let selectedFile
+let voiceMode = load('voice', 'neural') === 'system' ? 'system' : 'neural'
+let neuralSession
+let neuralFrame
+let downloadPercent = -1
 let readerPart
 let readerLines = []
 let activeLine = -1
+const neural = new NeuralVoice(percent => {
+  if (!neuralSession || !Number.isFinite(percent)) return
+  const step = Math.floor(percent / 5) * 5
+  if (step === downloadPercent) return
+  downloadPercent = step
+  playerError('Descargando la voz natural… ' + step + '%')
+})
+
 $('#speed').value = String(speed).replace(/^0\./, '.')
+$('#voice').value = voiceMode
 renderIcons(document)
 
 function notify(message) {
@@ -312,7 +327,7 @@ function lineIndex(position) {
 
 function updateReader() {
   if ($('#reading').hidden || !speaking() || readerPart !== activePart()) return
-  const index = lineIndex(current.position)
+  const index = lineIndex(neuralSession?.offset ?? current.position)
   if (index < 0 || index === activeLine) return
   readerLines[activeLine]?.element.removeAttribute('aria-current')
   activeLine = index
@@ -376,6 +391,10 @@ function persist(force = false) {
 
 function stopSpeech() {
   utterance = undefined
+  neuralSession?.release?.()
+  neuralSession = undefined
+  cancelAnimationFrame(neuralFrame)
+  neural.stop()
   speechPlaying = false
   window.speechSynthesis?.cancel()
 }
@@ -460,7 +479,68 @@ function speechChunk(text, start) {
 
 function startNarration() {
   stopSpeech()
-  startSpeech()
+  if (voiceMode === 'system') startSpeech()
+  else startNeural()
+}
+
+async function startNeural() {
+  const text = activePart().text
+  const position = Math.floor(current.position)
+  const wordPrefix = /[\p{L}\p{M}\p{N}]+$/u.exec(text.slice(Math.max(0, position - 220), position))
+  const insideWord = /^[\p{L}\p{M}\p{N}]/u.test(text.slice(position))
+  const session = { offset: insideWord && wordPrefix ? position - wordPrefix[0].length : position }
+  neuralSession = session
+  downloadPercent = -1
+  speechPlaying = true
+  const requestPart = current
+  const generate = offset => {
+    const phrase = speechChunk(text, offset)
+    const samples = phrase.trim() ? neural.generate(phrase.trim()) : Promise.resolve(null)
+    samples.catch(() => {})
+    return { phrase, samples }
+  }
+  try {
+    await neural.unlock()
+    if (neuralSession !== session) return
+    let segment = generate(session.offset)
+    while (neuralSession === session && session.offset < text.length) {
+      const offset = session.offset
+      const end = offset + segment.phrase.length
+      playerError('Preparando la narración…')
+      updateReader()
+      const samples = await segment.samples
+      if (neuralSession !== session) return
+      const next = end < text.length ? generate(end) : null
+      if (samples) {
+        playerError()
+        await new Promise(resolve => {
+          session.release = resolve
+          neural.play(samples, speed, resolve)
+          const tick = () => {
+            if (neuralSession !== session) return
+            current.position = offset + Math.floor(neural.fraction() * segment.phrase.length)
+            updateTimeline()
+            persist()
+            neuralFrame = requestAnimationFrame(tick)
+          }
+          neuralFrame = requestAnimationFrame(tick)
+        })
+        cancelAnimationFrame(neuralFrame)
+        if (neuralSession !== session) return
+      }
+      current.position = end
+      persist(true)
+      session.offset = end
+      segment = next
+    }
+    if (neuralSession === session) finishPart()
+  } catch (error) {
+    if (neuralSession !== session || current !== requestPart) return
+    console.warn('Lumbre: voz natural', error)
+    stopSpeech()
+    updatePlayer()
+    playerError('La voz natural no está disponible. Reintenta o elige Voz del dispositivo en Lectura.')
+  }
 }
 
 function startSpeech() {
@@ -579,7 +659,17 @@ $('#speed').addEventListener('change', event => {
   speed = Number(event.target.value)
   save('speed', speed)
   audio.playbackRate = speed
-  if (speechPlaying) startNarration()
+  if (speechPlaying && voiceMode === 'system') startNarration()
+  else if (neuralSession) neural.setRate(speed)
+})
+
+$('#voice').addEventListener('change', event => {
+  const playing = speechPlaying
+  voiceMode = event.target.value
+  save('voice', voiceMode)
+  playerError()
+  if (playing) startNarration()
+  updatePlayer()
 })
 
 function setSleep(minutes) {

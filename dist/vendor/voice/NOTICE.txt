@@ -1,0 +1,6 @@
+Kokoro JS 1.2.1 is published at https://github.com/hexgrad/kokoro/tree/main/kokoro.js.
+The Dora style tensor is from https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX.
+
+ephone 1.0.2 wraps eSpeak NG and is licensed GPL-3.0-or-later (see EPHONE-LICENSE.txt).
+Unmodified distribution: https://registry.npmjs.org/ephone/-/ephone-1.0.2.tgz
+Corresponding source and WebAssembly build scripts: https://github.com/sjmik/ephone-js/tree/master/emscripten
