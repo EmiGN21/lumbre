@@ -163,6 +163,10 @@ dialog::backdrop { background: #18271ede; }
 .import-mark { background: #e1e9dc; color: var(--forest); width: 43px; height: 43px; border-radius: 8px; margin-bottom: 11px; }
 .import-body h2 { font-size: 44px; }
 .import-body p { margin: 8px 0 15px; color: var(--muted); }
+.install-link { display: inline-flex; align-items: center; gap: 7px; min-height: 37px; padding: 4px 7px; background: transparent; border: 0; border-radius: 6px; color: var(--forest); font-weight: 700; }
+.install-link:hover { background: #dfe7d9; }
+.install-link svg { width: 16px; height: 16px; }
+.credits .install-link { margin: -9px 0; }
 .reader-head { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 23px; }
 .reader-head h1 { font: 400 clamp(37px,5.1vw,64px)/.98 var(--display); overflow-wrap: anywhere; }
 .reader-head p { color: var(--muted); margin-top: 8px; }
@@ -174,6 +178,7 @@ dialog::backdrop { background: #18271ede; }
 .reader-line:hover { background: #e0e7d9; color: var(--ink); }
 .reader-line[aria-current="true"] { background: #f2dfa7; color: #273528; }
 #reading .empty { min-height: 120px; }
+#install-dialog { width: min(470px,calc(100% - 30px)); }
 .reading-open[aria-pressed="true"] { color: var(--accent); background: #85998236; }
 .dropzone { position: relative; display: grid; justify-items: center; gap: 5px; border: 1px dashed #849a80; border-radius: 8px; padding: 20px 8px; text-align: center; cursor: pointer; }
 .dropzone:hover, .dropzone.drag { background: #e8eee3; }

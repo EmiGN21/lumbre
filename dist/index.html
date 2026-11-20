@@ -7,6 +7,8 @@
   <meta name="description" content="Escucha clásicos en español y convierte tus PDF en lecturas en voz alta.">
   <title>Lumbre — Audiolibros en español</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/app-192.png">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -20,6 +22,7 @@
       <a href="#lectura" data-view="lectura"><span data-icon="text"></span>Lectura</a>
     </nav>
     <div class="side-bottom">
+      <button class="install-link" data-action="install" hidden><span data-icon="install"></span>Instalar Lumbre</button>
       <button class="add-link" data-action="import"><span class="side-file" data-icon="file"></span><span><strong>Importar PDF</strong><small>Escucha tus documentos</small></span><span data-icon="plus"></span></button>
     </div>
   </aside>
@@ -59,7 +62,7 @@
         <div id="reader-text" tabindex="0" aria-label="Texto de la sección"></div>
         <div id="reader-empty" class="empty"></div>
       </section>
-      <footer class="credits" id="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso y tus PDF se guardan en este navegador.</span></footer>
+      <footer class="credits" id="credits"><span>Grabaciones del catálogo por <a href="https://librivox.org/" target="_blank" rel="noopener">LibriVox</a></span><span>El progreso y tus PDF se guardan en este navegador.</span><button class="install-link" data-action="install" hidden><span data-icon="install"></span>Instalar app</button></footer>
     </main>
   </div>
   <section class="dock" aria-label="Reproductor" id="dock" hidden>
@@ -104,6 +107,14 @@
         <p id="import-status" role="status" hidden></p>
         <button class="button primary" type="submit" id="import-submit"><span data-icon="plus"></span>Agregar a mi biblioteca</button>
       </form>
+    </div>
+  </dialog>
+  <dialog id="install-dialog" aria-labelledby="install-title">
+    <div class="dialog-top"><button class="icon-button close" data-action="close" aria-label="Cerrar" data-icon="close"></button></div>
+    <div class="import-body">
+      <h2 id="install-title">Instalar Lumbre</h2>
+      <p>En <strong>iPhone</strong>, abre Lumbre en Safari. Pulsa Compartir y elige <strong>Añadir a pantalla de inicio</strong>. Activa <strong>Abrir como app web</strong> si aparece.</p>
+      <p>En <strong>Android</strong>, abre Lumbre en Chrome. En el menú de los tres puntos, elige <strong>Instalar aplicación</strong> o <strong>Añadir a pantalla de inicio</strong>.</p>
     </div>
   </dialog>
   <div id="notice" class="toast" role="status" hidden></div>

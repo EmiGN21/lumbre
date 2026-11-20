@@ -6,4 +6,4 @@ Cada visitante puede escuchar grabaciones, guardar libros y añadir documentos P
 
 ## Platform
 
-Web adaptable a móvil y escritorio.
+Web adaptable a móvil y escritorio, instalable como PWA en Android y iPhone.

@@ -24,6 +24,7 @@ const drawings = {
   bookmark: '<path d="M7 4h10v16l-5-4-5 4z"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6m4-6v6"/>',
   text: '<path d="M4 5h16M4 10h16M4 15h16M4 20h10"/>',
+  install: '<path d="M12 3v12m-4-4 4 4 4-4M5 16v5h14v-5"/>',
 }
 
 function icon(name) {
@@ -105,6 +106,7 @@ let downloadPercent = -1
 let readerPart
 let readerLines = []
 let activeLine = -1
+let installPrompt
 const neural = new NeuralVoice(percent => {
   if (!neuralSession || !Number.isFinite(percent)) return
   const step = Math.floor(percent / 5) * 5
@@ -799,6 +801,7 @@ document.addEventListener('click', event => {
     case 'sleep': setSleep(Number(target.dataset.minutes)); break
     case 'clear-search': search.value = ''; renderShelf(); search.focus(); break
     case 'retry': loadCatalog(); break
+    case 'install': installApp(); break
     case 'bookmark':
       if (saved.has(book.id)) saved.delete(book.id)
       else saved.add(book.id)
@@ -830,6 +833,39 @@ window.addEventListener('pagehide', () => { persist(true); if (speaking()) stopS
 window.addEventListener('pageshow', event => { if (event.persisted) updatePlayer() })
 document.addEventListener('visibilitychange', () => { if (document.hidden) persist(true) })
 window.speechSynthesis?.getVoices()
+
+function showInstallButtons() {
+  const installed = matchMedia('(display-mode: standalone)').matches || navigator.standalone
+  const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  for (const button of $$('[data-action="install"]')) button.hidden = installed || !(mobile || installPrompt)
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault()
+  installPrompt = event
+  showInstallButtons()
+})
+window.addEventListener('appinstalled', () => {
+  installPrompt = undefined
+  for (const button of $$('[data-action="install"]')) button.hidden = true
+})
+showInstallButtons()
+
+async function installApp() {
+  if (!installPrompt) {
+    $('#install-dialog').showModal()
+    return
+  }
+  const prompt = installPrompt
+  installPrompt = undefined
+  try { await prompt.prompt() } catch { $('#install-dialog').showModal() }
+  showInstallButtons()
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Lumbre: instalación', error))
+}
 
 async function loadCatalog() {
   loading = true
